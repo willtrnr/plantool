@@ -1,0 +1,53 @@
+[tool.poetry]
+name = "plantool"
+version = "0.1.0"
+description = "Quick tool to help dealing with MSSQL query plans."
+authors = ["William Turner <willtur.will@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+click = "^8.1.2"
+lxml = "^4.8.0"
+python = "^3.10"
+sqlparse = { git = "https://github.com/willtrnr/sqlparse.git", rev = "mssql-param-fix" }
+
+[tool.poetry.dev-dependencies]
+black = "^22.3.0"
+isort = "^5.10.1"
+pylint = "^2.13.7"
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+
+[tool.pylint.master]
+extension-pkg-allow-list = [
+  "lxml",
+]
+
+[tool.pylint.message-control]
+disable = [
+  "line-too-long",
+  "missing-class-docstring",
+  "missing-function-docstring",
+  "missing-module-docstring",
+  "no-member",
+]
+
+[tool.pylint.format]
+max-line-length = 88
+
+[tool.pyright]
+pythonVersion = "3.10"
+pythonPlatform = "Linux"
+useLibraryCodeForTypes = true
+
+[tool.isort]
+profile = "black"
+skip_gitignore = true
+combine_as_imports = true
+combine_star = true
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
