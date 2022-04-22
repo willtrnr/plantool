@@ -15,10 +15,13 @@ NS = {
     "sp": "http://schemas.microsoft.com/sqlserver/2004/07/showplan",
 }
 
+PARAM_TYPE = 0
+PARAM_VALUE = 1
+
 
 def parse_plan(
     plan_file: TextIO,
-) -> Iterator[tuple[sql.Statement | None, Mapping[str, str]]]:
+) -> Iterator[tuple[sql.Statement | None, Mapping[str, tuple[str, str]]]]:
     root = ET.parse(plan_file).getroot()
     for stmt_el in root.iterfind(
         "./sp:BatchSequence/sp:Batch/sp:Statements/sp:StmtSimple", NS
@@ -28,27 +31,35 @@ def parse_plan(
             stmt = sqlparse.parse(text)[0]
 
         yield stmt, {
-            el.attrib["Column"]: el.attrib["ParameterCompiledValue"]
+            el.attrib["Column"]: (
+                el.attrib["ParameterDataType"],
+                el.attrib["ParameterCompiledValue"],
+            )
             for el in stmt_el.iterfind(
                 "./sp:QueryPlan/sp:ParameterList/sp:ColumnReference", NS
             )
         }
 
 
-def replace_params(root: sql.TokenList, params: Mapping[str, str]) -> sql.TokenList:
+def replace_params_inline(
+    root: sql.TokenList,
+    params: Mapping[str, tuple[str, str]],
+) -> sql.TokenList:
     tokens = []
     for token in root.tokens:
         if token.match(t.Name, values=params.keys()):
-            tokens.append(sql.Token(t.Name, params[token.value]))
+            tokens.append(sql.Token(t.Name, params[token.value][PARAM_VALUE]))
         elif isinstance(token, sql.TokenList):
-            tokens.append(replace_params(token, params))
+            tokens.append(replace_params_inline(token, params))
         else:
             tokens.append(token)
     return type(root)(tokens)
 
+
 @click.group()
 def cli() -> None:
     pass
+
 
 @cli.command()
 @click.argument("plan_file", type=click.File(encoding="utf-16"))
@@ -67,13 +78,21 @@ def inline(plan_file: TextIO, script: TextIO | None) -> None:
             continue
         click.echo(
             sqlparse.format(
-                str(replace_params(stmt, params)),
+                str(replace_params_inline(stmt, params)),
                 keyword_case="upper",
                 reindent=True,
                 reindent_align=False,
                 wrap_after=100,
             )
         )
+
+
+@cli.command()
+@click.argument("plan_file", type=click.File(encoding="utf-16"))
+def declare(plan_file: TextIO) -> None:
+    for _, params in parse_plan(plan_file):
+        for name, (dtype, value) in params.items():
+            click.echo(f"DECLARE {name} AS {dtype} = {value}")
 
 
 @cli.command()
