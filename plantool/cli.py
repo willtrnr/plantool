@@ -41,6 +41,21 @@ def parse_plan(
         }
 
 
+def merge_parse(
+    plan: TextIO,
+    script: TextIO | None,
+) -> Iterator[tuple[sql.Statement | None, Mapping[str, tuple[str, str]]]]:
+    stmts = parse_plan(plan)
+
+    if script is not None:
+        return zip(
+            (stmt for stmt in sqlparse.parsestream(script) if not stmt.is_whitespace),
+            (params for _, params in stmts),
+        )
+
+    return stmts
+
+
 def replace_params_inline(
     root: sql.TokenList,
     params: Mapping[str, tuple[str, str]],
@@ -63,19 +78,12 @@ def cli() -> None:
 
 @cli.command()
 @click.argument("plan_file", type=click.File(encoding="utf-16"))
-@click.argument("script", type=click.File(encoding="utf-8"), required=False)
-def inline(plan_file: TextIO, script: TextIO | None) -> None:
-    stmts = parse_plan(plan_file)
-
-    if script is not None:
-        stmts = zip(
-            (stmt for stmt in sqlparse.parsestream(script) if not stmt.is_whitespace),
-            (params for _, params in stmts),
-        )
-
-    for stmt, params in stmts:
+@click.argument("script_file", type=click.File(encoding="utf-8"), required=False)
+def inline(plan_file: TextIO, script_file: TextIO | None) -> None:
+    for stmt, params in merge_parse(plan_file, script_file):
         if not stmt:
             continue
+
         click.echo(
             sqlparse.format(
                 str(replace_params_inline(stmt, params)),
@@ -89,10 +97,24 @@ def inline(plan_file: TextIO, script: TextIO | None) -> None:
 
 @cli.command()
 @click.argument("plan_file", type=click.File(encoding="utf-16"))
-def declare(plan_file: TextIO) -> None:
-    for _, params in parse_plan(plan_file):
+@click.argument("script_file", type=click.File(encoding="utf-8"), required=False)
+def declare(plan_file: TextIO, script_file: TextIO | None) -> None:
+    for stmt, params in merge_parse(plan_file, script_file):
         for name, (dtype, value) in params.items():
             click.echo(f"DECLARE {name} AS {dtype} = {value}")
+
+        if not stmt:
+            continue
+
+        click.echo(
+            sqlparse.format(
+                str(stmt),
+                keyword_case="upper",
+                reindent=True,
+                reindent_align=False,
+                wrap_after=100,
+            )
+        )
 
 
 @cli.command()
