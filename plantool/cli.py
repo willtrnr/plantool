@@ -90,7 +90,6 @@ def inline(plan_file: TextIO, script_file: TextIO | None) -> None:
                 keyword_case="upper",
                 reindent=True,
                 reindent_align=False,
-                wrap_after=100,
             )
         )
 
@@ -112,7 +111,6 @@ def declare(plan_file: TextIO, script_file: TextIO | None) -> None:
                 keyword_case="upper",
                 reindent=True,
                 reindent_align=False,
-                wrap_after=100,
             )
         )
 
