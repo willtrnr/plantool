@@ -3,13 +3,9 @@ from __future__ import annotations
 from typing import Iterator, Mapping, TextIO
 
 import click
+import lxml.etree as ET
 import sqlparse
 from sqlparse import sql, tokens as t
-
-try:
-    import lxml.etree as ET
-except ImportError:
-    import xml.etree.ElementTree as ET
 
 NS = {
     "sp": "http://schemas.microsoft.com/sqlserver/2004/07/showplan",
@@ -22,7 +18,7 @@ PARAM_VALUE = 1
 def parse_plan(
     plan_file: TextIO,
 ) -> Iterator[tuple[sql.Statement | None, Mapping[str, tuple[str, str]]]]:
-    root = ET.parse(plan_file).getroot()
+    root = ET.parse(plan_file, parser=ET.XMLParser(huge_tree=True)).getroot()
     for stmt_el in root.iterfind(
         "./sp:BatchSequence/sp:Batch/sp:Statements/sp:StmtSimple", NS
     ):
